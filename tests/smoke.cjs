@@ -42,7 +42,72 @@ let activeBrowser;
   await page.waitForFunction(
     () => document.querySelectorAll("tbody tr").length === 1,
   );
+  await page
+    .getByRole("textbox", { name: "Search bookings" })
+    .fill("  paper moon  ");
+  await page.waitForFunction(
+    () => document.querySelectorAll("tbody tr").length === 2,
+  );
   await page.getByRole("textbox", { name: "Search bookings" }).fill("");
+  await page.getByLabel("Filter by company").selectOption("Moving Stories");
+  await page.waitForFunction(
+    () => document.querySelectorAll("tbody tr").length === 1,
+  );
+  assert.ok(
+    (await page.locator("tbody").innerText()).includes("Between the Lines"),
+  );
+  await page
+    .getByLabel("Filter by production")
+    .selectOption("The Last Lighthouse");
+  await page
+    .getByText("No bookings match these filters.", { exact: true })
+    .waitFor();
+  await page.getByLabel("Filter by company").selectOption("All companies");
+  await page.waitForFunction(
+    () => document.querySelectorAll("tbody tr").length === 2,
+  );
+  await page.getByLabel("Filter by production").selectOption("All productions");
+  for (const [directory, query, expected] of [
+    ["Venues", "oxford", "Riverside Arts"],
+    ["Companies", "charlie", "Paper Moon Theatre"],
+    ["Productions", "paper moon", "The Last Lighthouse"],
+  ]) {
+    await page
+      .getByRole("navigation")
+      .getByRole("button", { name: directory, exact: true })
+      .click();
+    const input = page.getByRole("textbox", {
+      name: "Search " + directory.toLowerCase(),
+    });
+    await input.fill(query);
+    await page.waitForFunction(
+      () => document.querySelectorAll(".directory .panel").length === 1,
+    );
+    assert.equal(await page.locator(".directory h2").innerText(), expected);
+    await input.fill("no such record");
+    await page
+      .getByText("No " + directory.toLowerCase() + " match your search.", {
+        exact: true,
+      })
+      .waitFor();
+    await input.fill("");
+    await page.waitForFunction(
+      () => document.querySelectorAll(".directory .panel").length > 1,
+    );
+  }
+  await page
+    .getByRole("navigation")
+    .getByRole("button", { name: "Bookings", exact: true })
+    .click();
+  assert.ok(
+    !(await page.locator("main").innerText()).includes("A LITTLE LESS ADMIN"),
+  );
+  assert.ok(
+    !(await page.locator("main").innerText()).includes("Keep the dates"),
+  );
+  assert.ok(
+    !(await page.locator("main").innerText()).includes("One place for every"),
+  );
   await page.getByRole("button", { name: "＋ New booking" }).click();
   await page.getByLabel("Performance date", { exact: true }).fill("2027-02-12");
   await page.getByLabel("Venue", { exact: true }).selectOption("2");
@@ -119,7 +184,7 @@ let activeBrowser;
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: search, create/edit, reload persistence, artist briefing, task completion, CSV selection, calendar and mobile layout; no browser errors.",
+    "PASS: directory search, company search and combined filters, create/edit, reload persistence, artist briefing, task completion, CSV selection, calendar and mobile layout; no browser errors.",
   );
   await browser.close();
 })()
