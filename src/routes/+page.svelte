@@ -7,6 +7,7 @@
   let search = $state("");
   let status = $state("All statuses");
   let productionFilter = $state("All productions");
+  let companyFilter = $state("All companies");
   let selected = $state(null);
   let draft = $state(null);
   let view = $state("List");
@@ -15,6 +16,25 @@
   const statuses = ["Placeholder", "Pencilled", "Confirmed", "Cancelled"];
   const production = (id) => productions.find((p) => p.id === id);
   const venue = (id) => venues.find((v) => v.id === id);
+  const company = (id) => companies.find((c) => c.id === id);
+  const matchesSearch = (values) =>
+    values.join(" ").toLowerCase().includes(search.trim().toLowerCase());
+  let directoryItems = $derived(
+    (page === "Venues"
+      ? venues
+      : page === "Companies"
+        ? companies
+        : productions
+    ).filter((item) =>
+      matchesSearch([
+        item.name,
+        item.city || "",
+        item.contact || "",
+        item.email || "",
+        item.companyId ? company(item.companyId).name : "",
+      ]),
+    ),
+  );
   const dateLabel = (value) =>
     new Date(value + "T12:00:00").toLocaleDateString("en-GB", {
       day: "numeric",
@@ -28,9 +48,15 @@
           (status === "All statuses" || b.status === status) &&
           (productionFilter === "All productions" ||
             production(b.productionId).name === productionFilter) &&
-          `${production(b.productionId).name} ${venue(b.venueId).name} ${venue(b.venueId).city}`
-            .toLowerCase()
-            .includes(search.toLowerCase()),
+          (companyFilter === "All companies" ||
+            company(production(b.productionId).companyId).name ===
+              companyFilter) &&
+          matchesSearch([
+            production(b.productionId).name,
+            company(production(b.productionId).companyId).name,
+            venue(b.venueId).name,
+            venue(b.venueId).city,
+          ]),
       )
       .sort((a, b) => a.date.localeCompare(b.date)),
   );
@@ -240,16 +266,11 @@
         >
         <div class="heading">
           <div>
-            <p class="eyebrow">BOOKING DETAILS</p>
             <h1>
               {selected === "new"
                 ? "New booking"
                 : production(draft.productionId).name}
             </h1>
-            <p>
-              Everything needed to take this show from a conversation to curtain
-              up.
-            </p>
           </div>
         </div>
         <form
@@ -428,9 +449,7 @@
       {:else if page === "Bookings"}
         <div class="heading">
           <div>
-            <p class="eyebrow">A LITTLE LESS ADMIN. A LITTLE MORE THEATRE.</p>
             <h1>Your bookings</h1>
-            <p>Keep the dates, details and next steps moving together.</p>
           </div>
           <button class="primary" onclick={add}>＋ New booking</button>
         </div>
@@ -442,9 +461,7 @@
           </div>
           <div>
             <span><i class="dot green"></i> Confirmed</span><strong
-              >{bookings.filter((b) => b.status === "Confirmed").length}<small
-                >ready to go ahead</small
-              ></strong
+              >{bookings.filter((b) => b.status === "Confirmed").length}</strong
             >
           </div>
           <div>
@@ -458,7 +475,7 @@
             <span><i class="dot purple"></i> Open actions</span><strong
               >{bookings.filter(
                 (b) => !b.done && b.task && b.status !== "Cancelled",
-              ).length}<small>keep things moving</small></strong
+              ).length}</strong
             >
           </div>
         </div>
@@ -466,7 +483,6 @@
           <div class="panel-heading">
             <div>
               <h2>Tour schedule</h2>
-              <p>One place for every production and venue.</p>
             </div>
             <div class="segmented">
               {#each ["List", "Calendar"] as mode}<button
@@ -479,7 +495,7 @@
             <label class="search"
               ><span>⌕</span><input
                 aria-label="Search bookings"
-                placeholder="Search shows, venues or cities…"
+                placeholder="Search productions, companies, venues or cities…"
                 bind:value={search}
               /></label
             ><select
@@ -487,6 +503,10 @@
               bind:value={productionFilter}
               ><option>All productions</option>{#each productions as p}<option
                   >{p.name}</option
+                >{/each}</select
+            ><select aria-label="Filter by company" bind:value={companyFilter}
+              ><option>All companies</option>{#each companies as c}<option
+                  >{c.name}</option
                 >{/each}</select
             ><select aria-label="Filter by status" bind:value={status}
               ><option>All statuses</option>{#each statuses as s}<option
@@ -592,11 +612,7 @@
           <section class="panel soft">
             <span class="card-symbol">↗</span>
             <div>
-              <h2>From booking to website</h2>
-              <p>
-                Export confirmed performances without keeping a second
-                spreadsheet.
-              </p>
+              <h2>Website export</h2>
               <button
                 class="text-link"
                 onclick={() => (page = "Website export")}
@@ -607,11 +623,7 @@
           <section class="panel">
             <span class="card-symbol">✓</span>
             <div>
-              <h2>Stay one step ahead</h2>
-              <p>
-                Contracts, artist briefings and sales reports: give every
-                booking a next action.
-              </p>
+              <h2>Follow-ups</h2>
               <button class="text-link" onclick={() => (page = "Tasks")}
                 >View follow-ups →</button
               >
@@ -621,25 +633,31 @@
       {:else if page === "Venues" || page === "Companies" || page === "Productions"}
         <div class="heading">
           <div>
-            <p class="eyebrow">YOUR RELATIONSHIPS</p>
             <h1>{page}</h1>
-            <p>
-              {page === "Venues"
-                ? "The places and people behind every performance."
-                : page === "Companies"
-                  ? "The artists and companies you look after."
-                  : "Reusable show information for bookings and website listings."}
-            </p>
           </div>
         </div>
         <div class="notice neutral">
           Sample directory · Editing and importing these records will follow in
           the next iteration.
         </div>
+        <div class="directory-search">
+          <label class="search"
+            ><span aria-hidden="true">⌕</span><input
+              aria-label={"Search " + page.toLowerCase()}
+              placeholder={page === "Venues"
+                ? "Search venues, cities or contacts…"
+                : page === "Companies"
+                  ? "Search companies or contacts…"
+                  : "Search productions or companies…"}
+              bind:value={search}
+            /></label
+          >
+          <span class="hint" role="status"
+            >{directoryItems.length} {page.toLowerCase()}</span
+          >
+        </div>
         <div class="directory">
-          {#each page === "Venues" ? venues : page === "Companies" ? companies : productions as item}<section
-              class="panel"
-            >
+          {#each directoryItems as item}<section class="panel">
               <span class="directory-icon"
                 >{page === "Venues"
                   ? "⌂"
@@ -668,12 +686,13 @@
                 <p class="hint">{item.assets}</p>{/if}
             </section>{/each}
         </div>
+        {#if !directoryItems.length}<div class="panel empty">
+            No {page.toLowerCase()} match your search.
+          </div>{/if}
       {:else if page === "Tasks"}
         <div class="heading">
           <div>
-            <p class="eyebrow">KEEP THINGS MOVING</p>
             <h1>Your follow-ups</h1>
-            <p>Small next steps that keep a tour on track.</p>
           </div>
         </div>
         <section class="panel task-list">
@@ -711,7 +730,6 @@
       {:else if page === "Website export"}
         <div class="heading">
           <div>
-            <p class="eyebrow">ONE RECORD. MORE POSSIBILITIES.</p>
             <h1>Website export</h1>
             <p>Upcoming, confirmed performances marked for publication.</p>
           </div>

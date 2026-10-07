@@ -849,3 +849,38 @@ hr {
     padding-inline: 15px;
   }
 }
+
+.directory-search {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.directory-search .search {
+  background: #fff;
+  max-width: 650px;
+  margin: 0;
+}
+.filters {
+  flex-wrap: wrap;
+}
+.filters .search {
+  min-width: 240px;
+  margin-bottom: 0;
+}
+.filters select {
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .directory-search {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filters .search {
+    min-width: 0;
+  }
+  .filters select {
+    flex-basis: 45%;
+  }
+}
