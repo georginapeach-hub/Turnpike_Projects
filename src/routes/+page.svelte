@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { base } from "$app/paths";
   import { venues, companies, productions, seedBookings } from "$lib/data";
   import "./style.css";
   let bookings = $state(structuredClone(seedBookings));
@@ -215,9 +216,19 @@
       onclick={() => {
         page = "Bookings";
         selected = null;
+        search = "";
       }}
-      ><span class="brand-mark">t<span>.</span></span><span
-        >turnpike<small>PRODUCTIONS</small></span
+      ><picture
+        ><source
+          media="(max-width: 760px)"
+          srcset={base + "/branding/turnpike-black.jpg"}
+        /><img
+          class="brand-logo"
+          src={base + "/branding/turnpike-cream.png"}
+          alt="Turnpike Productions"
+          width="1200"
+          height="896"
+        /></picture
       ></a
     >
     <div class="workspace-label">YOUR WORKSPACE</div>

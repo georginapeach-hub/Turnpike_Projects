@@ -53,28 +53,23 @@ a {
   inset: 0 auto 0 0;
 }
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-family: "Manrope", sans-serif;
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -1px;
-}
-.brand-mark {
-  font-size: 53px;
-  line-height: 1;
-  color: #dceac6;
-}
-.brand-mark span {
-  color: #b4d080;
-}
-.brand small {
   display: block;
-  font-size: 9px;
-  letter-spacing: 3px;
-  font-weight: 500;
-  margin-top: 3px;
+  width: 100%;
+  aspect-ratio: 2.5;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.brand picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 .workspace-label {
   font-size: 10px;
@@ -354,6 +349,7 @@ h3 {
   padding: 10px;
 }
 .table-wrap {
+  position: relative;
   overflow-x: auto;
 }
 table {
@@ -734,13 +730,7 @@ hr {
     padding: 17px 20px;
   }
   .brand {
-    font-size: 20px;
-  }
-  .brand-mark {
-    font-size: 35px;
-  }
-  .brand small {
-    font-size: 7px;
+    width: 210px;
   }
   .workspace-label,
   .sidebar-bottom {
