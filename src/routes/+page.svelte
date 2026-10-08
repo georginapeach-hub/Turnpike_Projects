@@ -1,9 +1,10 @@
 <script>
   import { onMount } from "svelte";
   import { base } from "$app/paths";
-  import { venues, companies as seedCompanies, productions as seedProductions, seedBookings } from "$lib/data";
+  import { venues as seedVenues, companies as seedCompanies, productions as seedProductions, seedBookings } from "$lib/data";
   import DirectoryEditor from '$lib/DirectoryEditor.svelte';
   import { shared, client, readRecords, writeRecord } from '$lib/crm.js';
+  let venues = $state(structuredClone(seedVenues));
   let companies = $state(structuredClone(seedCompanies));
   let productions = $state(structuredClone(seedProductions));
   let directoryDraft = $state(null);
@@ -24,8 +25,8 @@
       const { data: member, error } = await client.from('crm_members').select('user_id').eq('user_id', session.user.id).maybeSingle();
       if (error) throw error;
       if (!member) throw new Error('Your account has not been added to the CRM team yet.');
-      const [b, c, p] = await Promise.all(['bookings','companies','productions'].map(readRecords));
-      bookings = b; companies = c; productions = p; ready = true;
+      const [b, c, p, v] = await Promise.all(['bookings','companies','productions','venues'].map(readRecords));
+      bookings = b; companies = c; productions = p; venues = v; ready = true;
     } catch (e) { loadingError = e.message; }
   }
   async function login(event) {
@@ -49,7 +50,7 @@
   async function logout() {
     const { error } = await client.auth.signOut();
     if (error) { notice = error.message; return; }
-    loggedIn = false; ready = false; bookings = []; companies = []; productions = []; selected = null; directoryDraft = null;
+    loggedIn = false; ready = false; bookings = []; companies = []; productions = []; venues = []; selected = null; directoryDraft = null;
   }
   function editDirectory(kind, item = null) {
     directoryKind = kind;
@@ -59,10 +60,10 @@
   }
   async function saveDirectory(record) {
     if (shared) await writeRecord(directoryKind, record);
-    const current = directoryKind === 'companies' ? companies : productions;
+    const current = directoryKind === 'companies' ? companies : directoryKind === 'venues' ? venues : productions;
     const next = current.some(x => x.id === record.id) ? current.map(x => x.id === record.id ? record : x) : [...current, record];
     if (!shared) localStorage.setItem('turnpike-' + directoryKind + '-v1', JSON.stringify(next));
-    if (directoryKind === 'companies') companies = next; else productions = next;
+    if (directoryKind === 'companies') companies = next; else if (directoryKind === 'venues') venues = next; else productions = next;
     directoryDraft = null; notice = shared ? 'Saved to the shared CRM.' : 'Saved in this browser only.';
   }
   async function toggleTask(b) {
@@ -86,7 +87,7 @@
   let storageReady = $state(false);
   const statuses = ["Placeholder", "Pencilled", "Confirmed", "Cancelled"];
   const production = (id) => productions.find((p) => p.id === id);
-  const venue = (id) => venues.find((v) => v.id === id);
+  const venue = (id) => venues.find((v) => v.id === id) || seedVenues.find((v) => v.id === id);
   const company = (id) => companies.find((c) => c.id === id);
   const matchesSearch = (values) =>
     values.join(" ").toLowerCase().includes(search.trim().toLowerCase());
@@ -153,10 +154,10 @@
       });
       return () => subscription.unsubscribe();
     }
-    for (const kind of ['companies', 'productions']) {
+    for (const kind of ['companies', 'productions', 'venues']) {
       try {
         const saved = JSON.parse(localStorage.getItem('turnpike-' + kind + '-v1') || 'null');
-        if (Array.isArray(saved)) { if (kind === 'companies') companies = saved; else productions = saved; }
+        if (Array.isArray(saved)) { if (kind === 'companies') companies = saved; else if (kind === 'venues') venues = saved; else productions = saved; }
       } catch { notice = 'Saved directory data could not be read.'; }
     }
     try {
@@ -198,7 +199,7 @@
     draft = {
       id: shared ? crypto.randomUUID() : Math.max(0, ...bookings.map((b) => Number(b.id) || 0)) + 1,
       productionId: productions[0]?.id,
-      venueId: 1,
+      venueId: venues[0]?.id,
       date: "",
       time: "19:30",
       status: "Placeholder",
@@ -219,7 +220,7 @@
     };
   }
   async function save() {
-    if (!draft.date || !draft.productionId) return;
+    if (!draft.date || !draft.productionId || !draft.venueId) return;
     if (shared) {
       try { await writeRecord('bookings', structuredClone($state.snapshot(draft))); }
       catch (e) { notice = 'Booking was not saved: ' + e.message; return; }
@@ -580,8 +581,13 @@
           <div>
             <h1>Your bookings</h1>
           </div>
-          <button class="primary" disabled={!productions.length} onclick={add}><span aria-hidden="true">＋</span> Add Booking</button>
+          <button class="primary" disabled={!productions.length || !venues.length} onclick={add} aria-describedby={!productions.length || !venues.length ? "booking-prerequisites" : undefined}><span aria-hidden="true">＋</span> Add Booking</button>
         </div>
+        {#if !productions.length || !venues.length}<div class="notice neutral" id="booking-prerequisites">
+          Before adding a booking, {#if !productions.length}add a company and production{#if !venues.length}, then add a venue{/if}{:else}add a venue{/if}.
+          {#if !productions.length}<button class="text-link" onclick={() => { page = companies.length ? 'Productions' : 'Companies'; search = ''; }}>{companies.length ? 'Go to Productions' : 'Go to Companies'}</button>{/if}
+          {#if !venues.length}<button class="text-link" onclick={() => { page = 'Venues'; search = ''; }}>Go to Venues</button>{/if}
+        </div>{/if}
         <div class="stats">
           <div>
             <span>Total bookings</span><strong
@@ -764,7 +770,7 @@
           <div>
             <h1>{page}</h1>
           </div>
-          {#if page !== 'Venues'}<button class="primary" onclick={() => editDirectory(page.toLowerCase())}><span aria-hidden="true">＋</span> Add {page === 'Companies' ? 'Company' : 'Production'}</button>{/if}
+          <button class="primary" onclick={() => editDirectory(page.toLowerCase())}><span aria-hidden="true">＋</span> Add {page === 'Companies' ? 'Company' : page === 'Venues' ? 'Venue' : 'Production'}</button>
         </div>
         <div class="notice neutral">
           {shared ? 'Shared directory · all team members can edit' : 'Demo directory · changes save in this browser only'}
@@ -813,13 +819,11 @@
                 <hr />
                 <p>{item.description}</p>
                 <p class="hint">{item.assets}</p>{/if}
-              {#if page !== 'Venues'}
                 {#if item.website}<p>{item.website}</p>{/if}
                 {#if item.about}<p>{item.about}</p>{/if}
                 {#if item.marketingCopy}<p class="marketing-copy">{item.marketingCopy}</p>{/if}
                 {#if item.pullQuotes}<blockquote>{item.pullQuotes}</blockquote>{/if}
-                <button class="secondary" onclick={() => editDirectory(page.toLowerCase(), item)}>Edit {page === 'Companies' ? 'company' : 'production'} / marketing materials</button>
-              {/if}
+                <button class="secondary" onclick={() => editDirectory(page.toLowerCase(), item)}>{page === 'Venues' ? 'Edit venue' : 'Edit ' + (page === 'Companies' ? 'company' : 'production') + ' / marketing materials'}</button>
             </section>{/each}
         </div>
         {#if !directoryItems.length}<div class="panel empty">

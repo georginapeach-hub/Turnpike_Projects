@@ -8,7 +8,7 @@ create policy "Members see own membership" on public.crm_members
   for select to authenticated using (user_id = auth.uid());
 
 create table if not exists public.crm_records (
-  kind text not null check (kind in ('bookings', 'companies', 'productions')),
+  kind text not null check (kind in ('bookings', 'companies', 'productions', 'venues')),
   id text not null,
   payload jsonb not null,
   primary key (kind, id)

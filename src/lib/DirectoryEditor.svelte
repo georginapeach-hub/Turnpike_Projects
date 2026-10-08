@@ -54,7 +54,7 @@
 </script>
 
 <section class="panel directory-editor">
-  <h2>{record.name ? 'Edit ' + record.name : 'Add ' + (kind === 'productions' ? 'Production' : 'Company')}</h2>
+  <h2>{record.name ? 'Edit ' + record.name : 'Add ' + (kind === 'productions' ? 'Production' : kind === 'venues' ? 'Venue' : 'Company')}</h2>
   {#if error}<p class="notice" role="alert">{error}</p>{/if}
   <form onsubmit={save}>
     <fieldset disabled={busy}>
@@ -67,15 +67,25 @@
         {#if draft.pack?.path}<button type="button" class="secondary" onclick={() => openAsset(draft.pack)}>Open uploaded venue pack</button>{/if}
         {#if draft.pack}<button type="button" class="secondary" onclick={() => draft.pack = null}>Remove venue pack</button>{/if}
         <label>Upload venue pack PDF<input type="file" accept="application/pdf" disabled={!shared} onchange={(e) => upload(e, true)} /></label>
-      {:else}
+      {:else if kind === 'companies'}
         <label>About the company<textarea rows="5" bind:value={draft.about}></textarea></label>
         <label>Contact name<input bind:value={draft.contact} /></label>
         <label>Contact email<input type="email" bind:value={draft.email} /></label>
         <label>Contact phone<input type="tel" bind:value={draft.phone} /></label>
         <label>Contact address<textarea bind:value={draft.address}></textarea></label>
         <label>Services<input bind:value={draft.services} /></label>
+      {:else}
+        <label>City<input bind:value={draft.city} /></label>
+        <label>Capacity<input type="number" min="0" step="1" bind:value={draft.capacity} /></label>
+        <label>Contact name<input bind:value={draft.contact} /></label>
+        <label>Contact email<input type="email" bind:value={draft.email} /></label>
+        <label>Contact phone<input type="tel" bind:value={draft.phone} /></label>
+        <label>Contact address<textarea bind:value={draft.address}></textarea></label>
+        <label>Parking and loading<textarea bind:value={draft.parking}></textarea></label>
+        <label>Technical information<textarea bind:value={draft.tech}></textarea></label>
       {/if}
       <label>Website link<input type="url" bind:value={draft.website} placeholder="https://…" /></label>
+      {#if kind !== 'venues'}
       <label>Marketing copy<textarea rows="7" bind:value={draft.marketingCopy}></textarea></label>
       <h3>Images</h3>
       <label>Image link<input type="url" bind:value={imageLink} placeholder="https://…" /></label>
@@ -83,13 +93,16 @@
       <label>Upload images<input type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={!shared} onchange={(e) => upload(e)} /></label>
       {#if !shared}<p class="hint">Demo mode supports existing HTTPS links. Shared CRM setup enables private PDF and image uploads.</p>{/if}
       {#each draft.images as asset, i}<div class="asset-row"><button type="button" class="text-link" onclick={() => openAsset(asset)}>{asset.name || asset.url}</button><button type="button" class="secondary" onclick={() => draft.images = draft.images.filter((_, index) => index !== i)}>Remove image</button></div>{/each}
-      <div class="form-footer"><button type="submit">Save {kind === 'productions' ? 'production' : 'company'}</button><button type="button" class="secondary" onclick={oncancel}>Cancel</button></div>
+      {/if}
+      <div class="form-footer"><button type="submit">Save {kind === 'productions' ? 'production' : kind === 'venues' ? 'venue' : 'company'}</button><button type="button" class="secondary" onclick={oncancel}>Cancel</button></div>
     </fieldset>
   </form>
+  {#if kind !== 'venues'}
   <hr />
   <h3>Email marketing materials</h3>
   <label>Venue<select aria-label="Venue" bind:value={recipient}><option value="">Choose a venue</option>{#each venues as venue}<option value={venue.email}>{venue.name}</option>{/each}</select></label>
   <label>Recipient email<input type="email" bind:value={recipient} /></label>
   <button type="button" class="secondary" disabled={busy || !recipient} onclick={prepareEmail}>Prepare email</button>
   {#if emailLink}<p><a href={emailLink}>Open draft in your email app</a></p><label>Email preview<textarea readonly rows="8" value={emailBody}></textarea></label><p class="hint">Review before sending. Files are linked, not attached. Private file links expire after seven days; prepare the email close to sending, or download and attach the files in your email app.</p>{/if}
+  {/if}
 </section>
