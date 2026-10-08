@@ -22,9 +22,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Check shared CRM configuration
+        env:
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$PUBLIC_SUPABASE_URL" ] || [ -z "$PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "Add PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY in Settings > Secrets and variables > Actions > Variables."
+            exit 1
+          fi
       - run: npm run build
         env:
           BASE_PATH: /Turnpike_Projects
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
