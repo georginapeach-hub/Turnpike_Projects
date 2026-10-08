@@ -296,7 +296,7 @@
   /></svelte:head
 >
 
-<div class="app-shell" data-hydrated={hydrated}>
+<div class="app-shell" class:auth-shell={shared && !ready} data-hydrated={hydrated}>
   <aside class="sidebar">
     <a
       class="brand"
@@ -362,11 +362,30 @@
           >
         </div>{/if}
       {#if shared && !ready}
-        <section class="panel">
+        <section class="panel sign-in-card">
+          <div class="sign-in-brand"><img src={base + '/branding/turnpike-cream.png'} alt="Turnpike Productions" width="1200" height="896" /></div>
+          <div class="sign-in-body">
+          <p class="sign-in-eyebrow">YOUR TEAM WORKSPACE</p>
           <h1>{loggedIn ? 'Open shared CRM' : 'Sign in to Turnpike'}</h1>
-          {#if loadingError}<p role="alert">{loadingError}</p>{/if}
-          {#if !loggedIn}<form onsubmit={login}><label>Email<input type="email" autocomplete="username" required bind:value={loginEmail} /></label><label>Password<input type="password" autocomplete="current-password" required bind:value={loginPassword} /></label><button disabled={authBusy}>Sign in</button><button type="button" class="secondary" disabled={authBusy || !loginEmail} onclick={sendSignInLink}>Email me a sign-in link</button></form>{:else}<button onclick={loadShared}>Retry loading</button>{/if}
-          <p class="hint">Invited team members can view and edit all CRM records.</p>
+          <p class="sign-in-intro">Bookings, productions and everything your team needs, together in one place.</p>
+          {#if loadingError}<p class="notice" role="alert">{loadingError}</p>{/if}
+          {#if !loggedIn}
+            <form onsubmit={(event) => { event.preventDefault(); sendSignInLink(); }}>
+              <label>Email address<input type="email" autocomplete="username" required placeholder="you@example.com" bind:value={loginEmail} /></label>
+              <button class="primary sign-in-button" disabled={authBusy}>{authBusy ? 'Please wait…' : 'Email me a sign-in link'}</button>
+            </form>
+            <p class="hint sign-in-help">Use your invited email address. We’ll send you a link to sign in—no password needed.</p>
+            <details class="password-sign-in">
+              <summary>Use a password instead</summary>
+              <form onsubmit={login}>
+                <label>Account email<input type="email" autocomplete="username" required bind:value={loginEmail} /></label>
+                <label>Password<input type="password" autocomplete="current-password" required bind:value={loginPassword} /></label>
+                <button class="secondary sign-in-button" disabled={authBusy}>Sign in</button>
+              </form>
+            </details>
+          {:else}<button class="primary sign-in-button" onclick={loadShared}>Retry loading</button><button class="secondary sign-in-button" onclick={logout}>Sign out</button>{/if}
+          <p class="sign-in-access">Private workspace · Invited team members only</p>
+          </div>
         </section>
       {:else if directoryDraft}
         <DirectoryEditor kind={directoryKind} record={directoryDraft} {companies} {venues} onsave={saveDirectory} oncancel={() => directoryDraft = null} />
@@ -378,7 +397,7 @@
           <div>
             <h1>
               {selected === "new"
-                ? "New booking"
+                ? "Add Booking"
                 : production(draft.productionId).name}
             </h1>
           </div>
@@ -548,7 +567,7 @@
           </div>
           <div class="form-footer">
             <span class="hint"
-              >Demo changes are stored on this device only.</span
+              >{shared ? 'Saved bookings are shared with your team.' : 'Demo changes are stored on this device only.'}</span
             ><button
               class="secondary"
               type="button"
@@ -561,7 +580,7 @@
           <div>
             <h1>Your bookings</h1>
           </div>
-          <button class="primary" disabled={!productions.length} onclick={add}>＋ New booking</button>
+          <button class="primary" disabled={!productions.length} onclick={add}><span aria-hidden="true">＋</span> Add Booking</button>
         </div>
         <div class="stats">
           <div>
@@ -745,11 +764,11 @@
           <div>
             <h1>{page}</h1>
           </div>
+          {#if page !== 'Venues'}<button class="primary" onclick={() => editDirectory(page.toLowerCase())}><span aria-hidden="true">＋</span> Add {page === 'Companies' ? 'Company' : 'Production'}</button>{/if}
         </div>
         <div class="notice neutral">
           {shared ? 'Shared directory · all team members can edit' : 'Demo directory · changes save in this browser only'}
         </div>
-        {#if page !== 'Venues'}<button onclick={() => editDirectory(page.toLowerCase())}>New {page === 'Companies' ? 'company' : 'production'}</button>{/if}
         <div class="directory-search">
           <label class="search"
             ><span aria-hidden="true">⌕</span><input
