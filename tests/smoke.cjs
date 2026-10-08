@@ -36,8 +36,23 @@ let activeBrowser;
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("http://localhost:5180");
   await page.locator('.app-shell[data-hydrated="true"]').waitFor();
-  await page.getByRole("button", { name: "＋ New booking" }).waitFor();
+  await page.getByRole("button", { name: "Add Booking" }).waitFor();
 
+  const buttonStyle = await page.getByRole('button', { name: 'Add Booking', exact: true }).evaluate(el => {
+    const s = getComputedStyle(el);
+    return { background: s.backgroundColor, color: s.color, font: s.font, padding: s.padding };
+  });
+  for (const [directory, action] of [['Companies', 'Add Company'], ['Productions', 'Add Production']]) {
+    await page.getByRole('navigation').getByRole('button', { name: directory, exact: true }).click();
+    const button = page.locator('.heading').getByRole('button', { name: action, exact: true });
+    assert.deepEqual(await button.evaluate(el => {
+      const s = getComputedStyle(el);
+      return { background: s.backgroundColor, color: s.color, font: s.font, padding: s.padding };
+    }), buttonStyle);
+    await button.click();
+    await page.getByRole('heading', { name: action, exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  }
   // Marketing records persist independently of bookings and feed email drafts.
   await page.getByRole('navigation').getByRole('button', {name: 'Companies', exact: true}).click();
   await page.getByRole('button', {name: 'Edit company / marketing materials'}).first().click();
@@ -146,7 +161,7 @@ let activeBrowser;
   assert.ok(
     !(await page.locator("main").innerText()).includes("One place for every"),
   );
-  await page.getByRole("button", { name: "＋ New booking" }).click();
+  await page.getByRole("button", { name: "Add Booking" }).click();
   await page.getByLabel("Performance date", { exact: true }).fill("2027-02-12");
   await page.getByLabel("Venue", { exact: true }).selectOption("2");
   await page
@@ -167,7 +182,7 @@ let activeBrowser;
   );
   await page.reload();
   await page.locator('.app-shell[data-hydrated="true"]').waitFor();
-  await page.getByRole("button", { name: "＋ New booking" }).waitFor();
+  await page.getByRole("button", { name: "Add Booking" }).waitFor();
   await page.waitForFunction(
     () => document.querySelectorAll("tbody tr").length === 5,
   );

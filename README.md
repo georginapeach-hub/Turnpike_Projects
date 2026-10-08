@@ -24,7 +24,7 @@ In a restricted cloud workspace, use `npm ci --cache /tmp/turnpike-npm-cache`.
 
 ## Try the workflow
 
-1. Open **New booking**, choose a production and venue, and enter a date.
+1. Open **Add Booking**, choose a production and venue, and enter a date.
 2. Save it, then reopen it to edit logistics, contract progress and the deal.
 3. Set a task and deadline; mark it complete from **Tasks**.
 4. Mark an upcoming, confirmed booking for publication. **Website export**
@@ -125,3 +125,13 @@ mailto link. Sending and editing the draft happen in the email app.
 `npm run test:smoke` covers local directory edits, reload persistence and email
 contents as well as the existing booking workflow. It does not validate a live
 Supabase project's authentication or access policies.
+
+
+### Pages styling regression check
+
+After a shared-mode build (`BASE_PATH=/Turnpike_Projects npm run build` with the
+public Supabase settings configured), run
+`CHROMIUM_PATH=/usr/bin/chromium node tests/pages-sign-in.cjs`.
+This checks CSS/JavaScript/image loading with and without a trailing slash,
+desktop/mobile sign-in layout, and mocked email sign-in; it does not send email
+or validate live Supabase access.

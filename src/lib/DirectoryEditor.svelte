@@ -54,7 +54,7 @@
 </script>
 
 <section class="panel directory-editor">
-  <h2>{record.name ? 'Edit ' + record.name : 'New ' + (kind === 'productions' ? 'production' : 'company')}</h2>
+  <h2>{record.name ? 'Edit ' + record.name : 'Add ' + (kind === 'productions' ? 'Production' : 'Company')}</h2>
   {#if error}<p class="notice" role="alert">{error}</p>{/if}
   <form onsubmit={save}>
     <fieldset disabled={busy}>
