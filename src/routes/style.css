@@ -874,3 +874,9 @@ hr {
     flex-basis: 45%;
   }
 }
+
+.directory-editor { max-width: 850px; }
+.directory-editor fieldset { border: 0; padding: 0; min-width: 0; }
+.directory-editor label { margin: 16px 0; }
+.asset-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0; overflow-wrap: anywhere; }
+.marketing-copy, blockquote { white-space: pre-wrap; overflow-wrap: anywhere; }

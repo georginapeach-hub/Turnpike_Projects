@@ -35,8 +35,46 @@ let activeBrowser;
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("http://localhost:5180");
+  await page.locator('.app-shell[data-hydrated="true"]').waitFor();
   await page.getByRole("button", { name: "＋ New booking" }).waitFor();
 
+  // Marketing records persist independently of bookings and feed email drafts.
+  await page.getByRole('navigation').getByRole('button', {name: 'Companies', exact: true}).click();
+  await page.getByRole('button', {name: 'Edit company / marketing materials'}).first().click();
+  await page.getByLabel('About the company').fill('Independent touring theatre');
+  await page.getByLabel('Contact phone').fill('01234 567890');
+  await page.getByLabel('Website link').fill('https://example.com/company');
+  await page.getByLabel('Marketing copy', {exact: true}).fill('Company marketing copy');
+  await page.getByRole('button', {name: 'Save company', exact: true}).click();
+  await page.reload();
+  await page.locator('.app-shell[data-hydrated="true"]').waitFor();
+  await page.getByRole('navigation').getByRole('button', {name: 'Companies', exact: true}).click();
+  await page.getByRole('button', {name: 'Edit company / marketing materials'}).first().click();
+  assert.equal(await page.getByLabel('About the company').inputValue(), 'Independent touring theatre');
+  assert.equal(await page.getByLabel('Contact phone').inputValue(), '01234 567890');
+  await page.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await page.getByRole('navigation').getByRole('button', {name: 'Productions', exact: true}).click();
+  await page.getByRole('button', {name: 'Edit production / marketing materials'}).first().click();
+  await page.getByLabel('Marketing copy', {exact: true}).fill('A brilliant touring show');
+  await page.getByLabel('Pull quotes').fill('“Excellent” — Example Review');
+  await page.getByLabel('Website link').fill('https://example.com/show');
+  await page.getByLabel('Venue pack PDF link').fill('https://example.com/pack.pdf');
+  await page.getByLabel('Image link', {exact: true}).fill('https://example.com/show.jpg');
+  await page.getByRole('button', {name: 'Add image link'}).click();
+  await page.getByRole('button', {name: 'Save production', exact: true}).click();
+  await page.reload();
+  await page.locator('.app-shell[data-hydrated="true"]').waitFor();
+  await page.getByRole('navigation').getByRole('button', {name: 'Productions', exact: true}).click();
+  await page.getByRole('button', {name: 'Edit production / marketing materials'}).first().click();
+  assert.equal(await page.getByLabel('Venue pack PDF link').inputValue(), 'https://example.com/pack.pdf');
+  await page.getByLabel('Venue', {exact: true}).selectOption('alex@example.com');
+  await page.getByRole('button', {name: 'Prepare email', exact: true}).click();
+  const email = await page.getByRole('link', {name: 'Open draft in your email app'}).getAttribute('href');
+  assert.ok(decodeURIComponent(email).includes('A brilliant touring show'));
+  assert.ok(decodeURIComponent(email).includes('https://example.com/pack.pdf'));
+  assert.ok(decodeURIComponent(email).includes('https://example.com/show.jpg'));
+  await page.getByRole('button', {name: 'Cancel', exact: true}).click();
+  await page.getByRole('navigation').getByRole('button', {name: 'Bookings', exact: true}).click();
   assert.equal(await page.locator("tbody tr").count(), 4);
   await page.getByRole("textbox", { name: "Search bookings" }).fill("Oxford");
   await page.waitForFunction(
@@ -128,6 +166,7 @@ let activeBrowser;
     () => document.querySelectorAll("tbody tr").length === 5,
   );
   await page.reload();
+  await page.locator('.app-shell[data-hydrated="true"]').waitFor();
   await page.getByRole("button", { name: "＋ New booking" }).waitFor();
   await page.waitForFunction(
     () => document.querySelectorAll("tbody tr").length === 5,
@@ -184,7 +223,7 @@ let activeBrowser;
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: directory search, company search and combined filters, create/edit, reload persistence, artist briefing, task completion, CSV selection, calendar and mobile layout; no browser errors.",
+    "PASS: company/production marketing edits, reload persistence, email contents, directory search, company search and combined filters, create/edit, reload persistence, artist briefing, task completion, CSV selection, calendar and mobile layout; no browser errors.",
   );
   await browser.close();
 })()

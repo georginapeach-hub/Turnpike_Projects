@@ -1,7 +1,77 @@
 <script>
   import { onMount } from "svelte";
   import { base } from "$app/paths";
-  import { venues, companies, productions, seedBookings } from "$lib/data";
+  import { venues, companies as seedCompanies, productions as seedProductions, seedBookings } from "$lib/data";
+  import DirectoryEditor from '$lib/DirectoryEditor.svelte';
+  import { shared, client, readRecords, writeRecord } from '$lib/crm.js';
+  let companies = $state(structuredClone(seedCompanies));
+  let productions = $state(structuredClone(seedProductions));
+  let directoryDraft = $state(null);
+  let directoryKind = $state('');
+  let loggedIn = $state(false);
+  let loginEmail = $state('');
+  let loginPassword = $state('');
+  let authBusy = $state(false);
+  let ready = $state(!shared);
+  let hydrated = $state(false);
+  let loadingError = $state('');
+  async function loadShared() {
+    ready = false; loadingError = '';
+    try {
+      const { data: { session } } = await client.auth.getSession();
+      loggedIn = Boolean(session);
+      if (!loggedIn) return;
+      const { data: member, error } = await client.from('crm_members').select('user_id').eq('user_id', session.user.id).maybeSingle();
+      if (error) throw error;
+      if (!member) throw new Error('Your account has not been added to the CRM team yet.');
+      const [b, c, p] = await Promise.all(['bookings','companies','productions'].map(readRecords));
+      bookings = b; companies = c; productions = p; ready = true;
+    } catch (e) { loadingError = e.message; }
+  }
+  async function login(event) {
+    event.preventDefault(); authBusy = true;
+    try {
+      const { error } = await client.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+      if (error) throw error;
+      loginPassword = ''; await loadShared();
+    } catch (e) { loadingError = e.message; }
+    finally { authBusy = false; }
+  }
+  async function sendSignInLink() {
+    authBusy = true; loadingError = '';
+    try {
+      const { error } = await client.auth.signInWithOtp({ email: loginEmail, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin + base + '/' } });
+      if (error) throw error;
+      notice = 'Check your email for a sign-in link.';
+    } catch (e) { loadingError = e.message; }
+    finally { authBusy = false; }
+  }
+  async function logout() {
+    const { error } = await client.auth.signOut();
+    if (error) { notice = error.message; return; }
+    loggedIn = false; ready = false; bookings = []; companies = []; productions = []; selected = null; directoryDraft = null;
+  }
+  function editDirectory(kind, item = null) {
+    directoryKind = kind;
+    directoryDraft = item ? structuredClone($state.snapshot(item)) : {
+      id: crypto.randomUUID(), name: '', companyId: companies[0]?.id, images: []
+    };
+  }
+  async function saveDirectory(record) {
+    if (shared) await writeRecord(directoryKind, record);
+    const current = directoryKind === 'companies' ? companies : productions;
+    const next = current.some(x => x.id === record.id) ? current.map(x => x.id === record.id ? record : x) : [...current, record];
+    if (!shared) localStorage.setItem('turnpike-' + directoryKind + '-v1', JSON.stringify(next));
+    if (directoryKind === 'companies') companies = next; else productions = next;
+    directoryDraft = null; notice = shared ? 'Saved to the shared CRM.' : 'Saved in this browser only.';
+  }
+  async function toggleTask(b) {
+    const updated = { ...b, done: !b.done };
+    try {
+      if (shared) await writeRecord('bookings', updated);
+      bookings = bookings.map(x => x.id === b.id ? updated : x);
+    } catch (e) { notice = 'Task was not saved: ' + e.message; }
+  }
   import "./style.css";
   let bookings = $state(structuredClone(seedBookings));
   let page = $state("Bookings");
@@ -32,7 +102,7 @@
         item.city || "",
         item.contact || "",
         item.email || "",
-        item.companyId ? company(item.companyId).name : "",
+        item.companyId ? company(item.companyId)?.name || "" : "",
       ]),
     ),
   );
@@ -75,6 +145,20 @@
       .sort((a, b) => a.date.localeCompare(b.date)),
   );
   onMount(() => {
+    hydrated = true;
+    if (shared) {
+      loadShared();
+      const { data: { subscription } } = client.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') setTimeout(() => loadShared(), 0);
+      });
+      return () => subscription.unsubscribe();
+    }
+    for (const kind of ['companies', 'productions']) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('turnpike-' + kind + '-v1') || 'null');
+        if (Array.isArray(saved)) { if (kind === 'companies') companies = saved; else productions = saved; }
+      } catch { notice = 'Saved directory data could not be read.'; }
+    }
     try {
       const saved = JSON.parse(
         localStorage.getItem("turnpike-demo-v1") || "null",
@@ -96,7 +180,7 @@
     storageReady = true;
   });
   $effect(() => {
-    if (storageReady) {
+    if (storageReady && !shared) {
       try {
         localStorage.setItem("turnpike-demo-v1", JSON.stringify(bookings));
       } catch {
@@ -112,8 +196,8 @@
   function add() {
     selected = "new";
     draft = {
-      id: Math.max(0, ...bookings.map((b) => b.id)) + 1,
-      productionId: 1,
+      id: shared ? crypto.randomUUID() : Math.max(0, ...bookings.map((b) => Number(b.id) || 0)) + 1,
+      productionId: productions[0]?.id,
       venueId: 1,
       date: "",
       time: "19:30",
@@ -134,8 +218,12 @@
       payment: "Not invoiced",
     };
   }
-  function save() {
-    if (!draft.date) return;
+  async function save() {
+    if (!draft.date || !draft.productionId) return;
+    if (shared) {
+      try { await writeRecord('bookings', structuredClone($state.snapshot(draft))); }
+      catch (e) { notice = 'Booking was not saved: ' + e.message; return; }
+    }
     bookings =
       selected === "new"
         ? [...bookings, structuredClone($state.snapshot(draft))]
@@ -143,7 +231,7 @@
             b.id === draft.id ? structuredClone($state.snapshot(draft)) : b,
           );
     selected = null;
-    notice = "Booking saved in this browser.";
+    notice = shared ? "Booking saved to the shared CRM." : "Booking saved in this browser.";
   }
   function download(name, content, type) {
     const url = URL.createObjectURL(new Blob([content], { type }));
@@ -208,7 +296,7 @@
   /></svelte:head
 >
 
-<div class="app-shell">
+<div class="app-shell" data-hydrated={hydrated}>
   <aside class="sidebar">
     <a
       class="brand"
@@ -239,6 +327,7 @@
           onclick={() => {
             page = item;
             selected = null;
+            directoryDraft = null;
             search = "";
           }}
           ><span class="nav-icon">{icon}</span>{item}{#if item === "Tasks"}<span
@@ -250,8 +339,9 @@
         >{/each}
     </nav>
     <div class="sidebar-bottom">
-      <span class="demo-dot"></span> Prototype workspace
-      <p>Fictional data · saved locally</p>
+      <span class="demo-dot"></span> {shared ? "Shared CRM" : "Prototype workspace"}
+      <p>{shared ? "Invited team · everyone can edit" : "Fictional data · saved locally"}</p>
+      {#if shared && loggedIn}<button class="secondary" onclick={logout}>Sign out</button>{/if}
       <div class="profile">
         <span class="avatar">TP</span>
         <div>Turnpike team<small>Editor preview</small></div>
@@ -261,8 +351,8 @@
   <main id="bookings">
     <header class="topbar">
       <span>Workspace <span class="slash">/</span> {page}</span><span
-        class="sample-badge">SAMPLE DATA</span
-      >
+        class="sample-badge">{shared ? "TEAM CRM" : "SAMPLE DATA"}</span
+      >{#if shared && ready}<button class="secondary" onclick={async () => { selected = null; directoryDraft = null; await loadShared(); }}>Refresh shared records</button>{/if}
     </header>
     <div class="content">
       {#if notice}<div class="notice" role="status">
@@ -271,7 +361,16 @@
             onclick={() => (notice = "")}>×</button
           >
         </div>{/if}
-      {#if selected !== null && draft}
+      {#if shared && !ready}
+        <section class="panel">
+          <h1>{loggedIn ? 'Open shared CRM' : 'Sign in to Turnpike'}</h1>
+          {#if loadingError}<p role="alert">{loadingError}</p>{/if}
+          {#if !loggedIn}<form onsubmit={login}><label>Email<input type="email" autocomplete="username" required bind:value={loginEmail} /></label><label>Password<input type="password" autocomplete="current-password" required bind:value={loginPassword} /></label><button disabled={authBusy}>Sign in</button><button type="button" class="secondary" disabled={authBusy || !loginEmail} onclick={sendSignInLink}>Email me a sign-in link</button></form>{:else}<button onclick={loadShared}>Retry loading</button>{/if}
+          <p class="hint">Invited team members can view and edit all CRM records.</p>
+        </section>
+      {:else if directoryDraft}
+        <DirectoryEditor kind={directoryKind} record={directoryDraft} {companies} {venues} onsave={saveDirectory} oncancel={() => directoryDraft = null} />
+      {:else if selected !== null && draft}
         <button class="back" onclick={() => (selected = null)}
           >← Back to {page.toLowerCase()}</button
         >
@@ -462,7 +561,7 @@
           <div>
             <h1>Your bookings</h1>
           </div>
-          <button class="primary" onclick={add}>＋ New booking</button>
+          <button class="primary" disabled={!productions.length} onclick={add}>＋ New booking</button>
         </div>
         <div class="stats">
           <div>
@@ -648,9 +747,9 @@
           </div>
         </div>
         <div class="notice neutral">
-          Sample directory · Editing and importing these records will follow in
-          the next iteration.
+          {shared ? 'Shared directory · all team members can edit' : 'Demo directory · changes save in this browser only'}
         </div>
+        {#if page !== 'Venues'}<button onclick={() => editDirectory(page.toLowerCase())}>New {page === 'Companies' ? 'company' : 'production'}</button>{/if}
         <div class="directory-search">
           <label class="search"
             ><span aria-hidden="true">⌕</span><input
@@ -690,11 +789,18 @@
                 <p>{item.email}</p>
                 <hr />
                 <p class="hint">{item.services}</p>{:else}<p>
-                  {companies.find((c) => c.id === item.companyId).name}
+                  {companies.find((c) => c.id === item.companyId)?.name || "Company not set"}
                 </p>
                 <hr />
                 <p>{item.description}</p>
                 <p class="hint">{item.assets}</p>{/if}
+              {#if page !== 'Venues'}
+                {#if item.website}<p>{item.website}</p>{/if}
+                {#if item.about}<p>{item.about}</p>{/if}
+                {#if item.marketingCopy}<p class="marketing-copy">{item.marketingCopy}</p>{/if}
+                {#if item.pullQuotes}<blockquote>{item.pullQuotes}</blockquote>{/if}
+                <button class="secondary" onclick={() => editDirectory(page.toLowerCase(), item)}>Edit {page === 'Companies' ? 'company' : 'production'} / marketing materials</button>
+              {/if}
             </section>{/each}
         </div>
         {#if !directoryItems.length}<div class="panel empty">
@@ -716,10 +822,7 @@
                 type="checkbox"
                 aria-label={"Complete " + b.task}
                 checked={b.done}
-                onchange={() =>
-                  (bookings = bookings.map((x) =>
-                    x.id === b.id ? { ...x, done: !x.done } : x,
-                  ))}
+                onchange={() => toggleTask(b)}
               />
               <div>
                 <button
@@ -776,7 +879,7 @@
       {/if}
       <footer>
         Turnpike Productions <span
-          >Prototype · No shared accounts or live email integration yet</span
+          >{shared ? "Shared team workspace · email drafts open in your mail app" : "Demo · browser storage only · email drafts open in your mail app"}</span
         >
       </footer>
     </div>
