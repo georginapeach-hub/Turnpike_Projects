@@ -42,7 +42,7 @@ let activeBrowser;
     const s = getComputedStyle(el);
     return { background: s.backgroundColor, color: s.color, font: s.font, padding: s.padding };
   });
-  for (const [directory, action] of [['Companies', 'Add Company'], ['Productions', 'Add Production']]) {
+  for (const [directory, action] of [['Companies', 'Add Company'], ['Productions', 'Add Production'], ['Venues', 'Add Venue']]) {
     await page.getByRole('navigation').getByRole('button', { name: directory, exact: true }).click();
     const button = page.locator('.heading').getByRole('button', { name: action, exact: true });
     assert.deepEqual(await button.evaluate(el => {
@@ -53,6 +53,22 @@ let activeBrowser;
     await page.getByRole('heading', { name: action, exact: true }).waitFor();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   }
+  await page.getByRole('navigation').getByRole('button', { name: 'Venues', exact: true }).click();
+  await page.getByRole('button', { name: 'Add Venue', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Smoke Test Hall');
+  await page.getByLabel('City', { exact: true }).fill('Leeds');
+  await page.getByLabel('Contact email', { exact: true }).fill('venue@example.com');
+  await page.getByLabel('Capacity', { exact: true }).fill('120');
+  await page.getByRole('button', { name: 'Save venue', exact: true }).click();
+  await page.reload();
+  await page.locator('.app-shell[data-hydrated="true"]').waitFor();
+  await page.getByRole('navigation').getByRole('button', { name: 'Venues', exact: true }).click();
+  const venueCard = page.locator('.directory .panel').filter({ hasText: 'Smoke Test Hall' });
+  await venueCard.getByRole('button', { name: 'Edit venue', exact: true }).click();
+  assert.equal(await page.getByLabel('City', { exact: true }).inputValue(), 'Leeds');
+  await page.getByLabel('Technical information', { exact: true }).fill('Step-free stage access');
+  await page.getByRole('button', { name: 'Save venue', exact: true }).click();
+  await venueCard.getByText('Step-free stage access', { exact: true }).waitFor();
   // Marketing records persist independently of bookings and feed email drafts.
   await page.getByRole('navigation').getByRole('button', {name: 'Companies', exact: true}).click();
   await page.getByRole('button', {name: 'Edit company / marketing materials'}).first().click();
@@ -240,6 +256,37 @@ let activeBrowser;
   console.log(
     "PASS: company/production marketing edits, reload persistence, email contents, directory search, company search and combined filters, create/edit, reload persistence, artist briefing, task completion, CSV selection, calendar and mobile layout; no browser errors.",
   );
+  const empty = await browser.newPage();
+  empty.on('pageerror', error => errors.push(error.message));
+  await empty.goto('http://localhost:5180');
+  await empty.locator('.app-shell[data-hydrated="true"]').waitFor();
+  await empty.evaluate(() => {
+    for (const kind of ['companies','productions','venues']) localStorage.setItem('turnpike-' + kind + '-v1', '[]');
+    localStorage.setItem('turnpike-demo-v1', '[]');
+  });
+  await empty.reload();
+  await empty.locator('.app-shell[data-hydrated="true"]').waitFor();
+  assert.ok(await empty.getByRole('button', { name: 'Add Booking', exact: true }).isDisabled());
+  await empty.locator('#booking-prerequisites').waitFor();
+  for (const [directory, action, save, name] of [
+    ['Companies', 'Add Company', 'Save company', 'Test Touring Company'],
+    ['Productions', 'Add Production', 'Save production', 'Test Touring Show'],
+    ['Venues', 'Add Venue', 'Save venue', 'Test Touring Venue'],
+  ]) {
+    await empty.getByRole('navigation').getByRole('button', { name: directory, exact: true }).click();
+    await empty.getByRole('button', { name: action, exact: true }).click();
+    await empty.getByLabel('Name', { exact: true }).fill(name);
+    await empty.getByRole('button', { name: save, exact: true }).click();
+  }
+  await empty.getByRole('navigation').getByRole('button', { name: 'Bookings', exact: true }).click();
+  assert.ok(await empty.getByRole('button', { name: 'Add Booking', exact: true }).isEnabled());
+  await empty.getByRole('button', { name: 'Add Booking', exact: true }).click();
+  await empty.getByLabel('Performance date').fill('2027-06-01');
+  await empty.getByRole('button', { name: 'Save booking', exact: true }).click();
+  await empty.locator('tbody tr').filter({ hasText: 'Test Touring Show' }).waitFor();
+  assert.deepEqual(errors, []);
+  console.log('PASS: venue creation/editing/persistence and empty-directory onboarding through first booking.');
+  await empty.close();
   await browser.close();
 })()
   .catch((e) => {

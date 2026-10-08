@@ -36,14 +36,14 @@ Without Supabase configuration, all records are fictional. Changes are stored in
 under `turnpike-demo-v1`; browsers and devices do not share changes. Clearing that
 key restores sample bookings. Demo mode has no accounts, access controls, live emails,
 file uploads, electronic signatures or automatic financial calculations yet.
-Companies and productions can be created and edited, including marketing materials. Venues remain sample records. The calendar groups
+Companies, productions and venues can be created and edited. Companies and productions include marketing materials. The calendar groups
 performances by month. Each prototype booking represents one performance;
 multi-performance engagements and workshops are planned for the full CRM.
 
 Do not enter real contact details, confidential deals or other sensitive data in
 this public demo. Wix headers are based on the supplied screenshot and require
-verification against the full import template. End times and venue phone numbers
-are not collected yet; their CSV cells remain blank. Export includes only upcoming
+verification against the full import template. End times are not collected yet. The existing Wix export still leaves its end-time
+and venue-phone cells blank. Export includes only upcoming
 confirmed performances explicitly marked for publication. Export dates use the
 Europe/London timezone.
 
@@ -79,7 +79,7 @@ task completion, website CSV selection, calendar navigation and mobile layout.
 ## Shared team CRM (requires a Supabase project)
 
 The app now supports a shared database with sign-in. Every **invited CRM member**
-can view and edit bookings, companies and productions; public visitors cannot.
+can view and edit bookings, companies, productions and venues; public visitors cannot.
 The integration is implemented but requires verification against your project
 before entering real information. Demo browser records are not automatically
 copied into the shared database, and a fresh shared database starts empty.
@@ -105,8 +105,8 @@ copied into the shared database, and a fresh shared database starts empty.
 
 Use **Refresh shared records** to see changes made by colleagues. Edits save a
 whole record; simultaneous edits currently use the last successful save. Change
-history and conflict detection are not implemented. Venues are still fictional
-sample records, so a real editable venue directory remains a separate next step.
+history and conflict detection are not implemented. Venue records are shared too. New projects start empty: add a company, production
+and venue before creating the first booking.
 
 Production records store website, description, marketing copy, pull quotes,
 images and a venue-pack PDF. Company records store website, images, marketing
@@ -135,3 +135,16 @@ public Supabase settings configured), run
 This checks CSS/JavaScript/image loading with and without a trailing slash,
 desktop/mobile sign-in layout, and mocked email sign-in; it does not send email
 or validate live Supabase access.
+
+
+### Existing Supabase projects: add venue support
+
+Before deploying venue support, run `supabase/migrations/20261008_add_venues.sql`
+in the SQL editor. It updates the allowed record kinds and retains existing
+records and access rules; do not rerun the initial schema. Referenced legacy
+sample venues are retained for existing bookings; edit them or choose real
+venues as appropriate. Fresh projects should use the updated `schema.sql`.
+Venue fields include name, city, capacity, contact name/email/phone/address,
+website, parking/loading and technical information. Everyone in the CRM team
+can add and edit venues. Add Booking requires a production and venue and now
+shows instructions when either is missing.
